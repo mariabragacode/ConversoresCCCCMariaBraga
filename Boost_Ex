@@ -1,0 +1,111 @@
+# Projeto Final - Parte 2 - Eletrônica de Potência  
+# Conversor BOOST (Elevador de Tensão) - Bateria Power Bank
+# Autora: Maria da Conceição Braga da Silva
+# objetivo: Aumentar tensão de 3,7 V para 5V
+
+import numpy as numpy
+import matplotlib.pyplot as pyplot
+
+# Parâmetros 
+Vin = 3.7          # tensão da bateria
+D = 0.26           # duty para elevar 3.7 para 5V
+R = 5              # carga simulando 1A
+L = 100e-6         # indutor típico de boost portátil
+C = 100e-6         # capacitor de saída
+f = 100e3          # frequência
+T = 1 / f          # período
+
+# PARTE 1: um período 
+dt = T / 1000
+t = numpy.arange(0, T, dt)
+
+iL = numpy.zeros(len(t))
+vL = numpy.zeros(len(t))
+s = numpy.zeros(len(t))
+
+IL = 0
+Vout = Vin / (1 - D)
+
+for n in range(1, len(t)):
+
+    if t[n] < D * T:
+        vL[n] = Vin
+        dIL = vL[n] / L
+        s[n] = 1
+    else:
+        vL[n] = Vin - Vout
+        dIL = vL[n] / L
+        s[n] = 0
+
+    IL += dIL * dt
+    iL[n] = IL
+
+# PARTE 2: vários ciclos
+t_total = 5e-3
+dt2 = T / 1000
+t2 = numpy.arange(0, t_total, dt2)
+
+iL2 = numpy.zeros(len(t2))
+vC2 = numpy.zeros(len(t2))
+
+IL = 0
+Vc = 0
+
+for n in range(1, len(t2)):
+
+    if (n % int(T/dt2)) < int(D*(T/dt2)):
+        vL_inst = Vin
+    else:
+        vL_inst = Vin - Vc
+
+    # corrente do indutor
+    dIL = vL_inst / L
+    IL += dIL * dt2
+    iL2[n] = IL
+
+    # capacitor
+    Iload = Vc / R
+    dVc = (IL - Iload) / C
+    Vc += dVc * dt2
+    vC2[n] = Vc
+
+# FIGURA 1 
+fig1, ax = pyplot.subplots(3,1,figsize=(9,6))
+
+ax[0].plot(t*1e6, s)
+ax[0].set_title("Estado da Chave (Boost)")
+ax[0].grid(True)
+
+ax[1].plot(t*1e6, vL)
+ax[1].set_title("Tensão no Indutor")
+ax[1].grid(True)
+
+ax[2].plot(t*1e6, iL)
+ax[2].set_title("Corrente no Indutor")
+ax[2].grid(True)
+
+pyplot.tight_layout()
+
+# FIGURA 2 
+fig2, ax2 = pyplot.subplots(3,1,figsize=(9,6))
+
+ax2[0].plot(t2*1e3, iL2)
+ax2[0].set_title("Corrente no Indutor (vários ciclos)")
+ax2[0].grid(True)
+
+ax2[1].plot(t2*1e3, vC2)
+ax2[1].set_ylabel(Vout)
+ax2[1].set_title("Tensão de Saída (Boost)")
+ax2[1].grid(True)
+ax2[1].legend()
+
+# curva teórica
+Dcurve = numpy.linspace(0.01, 0.99, 500)
+Vcurve = Vin / (1 - Dcurve)
+
+ax2[2].plot(Dcurve, Vcurve)
+ax2[2].set_title("Vout x Duty Cycle (teórico)")
+ax2[2].grid(True)
+
+pyplot.tight_layout()
+pyplot.show()

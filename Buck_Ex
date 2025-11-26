@@ -1,0 +1,144 @@
+# Projeto Final - Parte 1 -  Eletrônica de Potência  
+# Conversor BUCK (Abaixador de Tensão)
+# Autora: Maria da Conceição Braga da Silva 
+# objetivo: reduzir de 24V para 12V - Sistema de Monitoramento
+
+import numpy
+import matplotlib.pyplot
+
+# Parâmetros do conversor buck ideal
+Vin = 24.0        # Tensão de entrada (V)
+D = 0.5           # Duty cycle (50%) → Vout esperado = 12 V
+R = 10.0          # Resistência de carga (ohms)
+L = 330e-6        # Indutor (H)
+C = 100e-6        # Capacitor (F)
+f = 50e3          # Frequência de chaveamento (Hz)
+T = 1.0 / f       # Período (s)
+
+Vout_ideal = Vin * D   # Tensão de saída ideal (12 V)
+
+# PARTE 1 – SIMULAÇÃO DE UM ÚNICO PERÍODO (modo ideal)
+
+dt = T / 1000.0                       # passo de tempo
+t = numpy.arange(0.0, T, dt)
+N = len(t)
+
+iL = numpy.zeros(N)                   # corrente no indutor
+vL = numpy.zeros(N)                   # tensão no indutor
+s  = numpy.zeros(N)                   # estado da chave
+
+IL = 0.0                              # corrente inicial
+
+for n in range(1, N):
+    if t[n] < D * T:
+        # Chave ON (MOSFET ligado)
+        vL[n] = Vin - Vout_ideal      # tensão no indutor
+        dIL = vL[n] / L               # di/dt
+        s[n] = 1.0
+    else:
+        # Chave OFF (diodo conduz)
+        vL[n] = -Vout_ideal
+        dIL = vL[n] / L
+        s[n] = 0.0
+
+    IL += dIL * dt                    # integração da corrente
+    iL[n] = IL
+
+# PARTE 2 – SIMULAÇÃO LONGA (vários períodos, ainda ideal)
+
+t_total = 5e-3                        # simular 5 ms
+dt2 = T / 1000
+t2 = numpy.arange(0.0, t_total, dt2)
+N2 = len(t2)
+
+iL2 = numpy.zeros(N2)                 # corrente no indutor
+vC2 = numpy.zeros(N2)                 # tensão no capacitor (saída)
+
+IL = 0.0
+Vc = 0.0
+
+passos_por_periodo = int(T / dt2)
+
+for n in range(1, N2):
+
+    posicao = n % passos_por_periodo
+
+    # PWM ideal
+    if posicao < D * passos_por_periodo:
+        # ON: Vin aplicado ao indutor + carga
+        vL_temp = Vin - Vc
+    else:
+        # OFF: indutor alimenta a carga
+        vL_temp = -Vc
+
+    # Atualiza corrente do indutor
+    dIL = vL_temp / L
+    IL += dIL * dt2
+
+    # indutor não deixa a corrente inverter o sentido
+    if IL < 0.0:
+        IL = 0.0
+
+    iL2[n] = IL
+
+    # Corrente na carga
+    I_carga = Vc / R
+
+    # Corrente no capacitor
+    I_cap = IL - I_carga
+
+    # Atualiza tensão no capacitor
+    dVc = I_cap / C
+    Vc += dVc * dt2
+
+    vC2[n] = Vc
+
+# FIGURA 1 – UM PERÍODO (formas de onda fundamentais do Buck)
+fig1, ax = matplotlib.pyplot.subplots(3, 1, figsize=(9, 6))
+
+ax[0].plot(t * 1e6, s)
+ax[0].set_title("Estado da Chave (um período)")
+ax[0].set_ylabel("S")
+ax[0].grid(True)
+
+ax[1].plot(t * 1e6, vL)
+ax[1].set_title("Tensão no Indutor vL (ideal)")
+ax[1].set_ylabel("vL (V)")
+ax[1].grid(True)
+
+ax[2].plot(t * 1e6, iL)
+ax[2].set_title("Corrente no Indutor iL (ideal)")
+ax[2].set_ylabel("iL (A)")
+ax[2].set_xlabel("Tempo (µs)")
+ax[2].grid(True)
+
+matplotlib.pyplot.tight_layout()
+
+# FIGURA 2 – VÁRIOS CICLOS + CURVA Vout × D (ideal)
+fig2, ax2 = matplotlib.pyplot.subplots(3, 1, figsize=(9, 6))
+
+# Corrente no indutor em vários ciclos
+ax2[0].plot(t2 * 1e3, iL2)
+ax2[0].set_title("Corrente no Indutor (vários ciclos, ideal)") 
+ax2[0].set_ylabel("iL (A)")
+ax2[0].grid(True)
+
+# Tensão de saída ao longo do tempo
+ax2[1].plot(t2 * 1e3, vC2)
+ax2[1].set_title("Tensão de Saída Vout – Regime Ideal")
+ax2[1].set_ylabel("Vout (V)")
+ax2[1].set_xlabel("Tempo (ms)")
+ax2[1].grid(True)
+
+# Curva teórica Vout x Duty (Buck ideal)
+Dcurve = numpy.linspace(0.0, 1.0, 500)
+Vcurve = Dcurve * Vin
+
+ax2[2].plot(Dcurve, Vcurve)
+ax2[2].set_title("Relação Teórica Vout × Duty Cycle")
+ax2[2].set_xlabel("Duty Cycle D")
+ax2[2].set_ylabel("Vout (V)")
+ax2[2].grid(True)
+
+matplotlib.pyplot.tight_layout()
+matplotlib.pyplot.show()
